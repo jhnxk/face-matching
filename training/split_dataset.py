@@ -3,6 +3,7 @@
 - dHash(64bit)로 해밍 거리 <= --dup-thresh 인 이미지끼리 같은 그룹으로 묶고,
   같은 그룹은 반드시 같은 분할에 들어가게 한다 (계획서 4-2).
 - 최다 득표 클래스(hard) 기준으로 층화(stratify)해서 분할별 클래스 비율을 맞춘다.
+- <data-dir>/celeb_soft_labels.csv (prepare_celeb.py 결과)가 있으면 함께 합쳐서 하나의 데이터셋으로 나눈다.
 
 실행 예:  python training/split_dataset.py --data-dir data
 출력: <data-dir>/dataset.csv  (soft_labels.csv + split 열)
@@ -45,11 +46,23 @@ def main():
     ap.add_argument("--ratios", nargs=3, type=float, default=[0.7, 0.15, 0.15])
     ap.add_argument("--dup-thresh", type=int, default=5)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--extra-labels", nargs="*", default=None,
+                    help="함께 합칠 라벨 파일 (기본: celeb_soft_labels.csv 가 있으면 자동 포함)")
     args = ap.parse_args()
     data_dir = Path(args.data_dir)
 
     with open(data_dir / "soft_labels.csv", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
+    print(f"FairFace 라벨: {len(rows)}장")
+    extras = args.extra_labels
+    if extras is None:
+        auto = data_dir / "celeb_soft_labels.csv"
+        extras = [str(auto)] if auto.exists() else []
+    for path in extras:
+        with open(path, encoding="utf-8") as f:
+            more = list(csv.DictReader(f))
+        print(f"추가 라벨: {Path(path).name} {len(more)}장")
+        rows += more
     hashes = [dhash(data_dir / "images" / r["image"]) for r in rows]
 
     uf = UnionFind(len(rows))
